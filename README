@@ -1,0 +1,28 @@
+About:
+======
+This script opens URIs depending on the content-type rather than just the URI
+scheme. For instance, will open http links to png files in the default image
+viewer.
+
+Also keeps in mind browser startup-time penalty while determining which
+browser to spawn to handle text/html links. This order can be controlled by
+editing `handler_overrides`.
+
+
+Requirements:
+=============
+Needs gobject-introspection-0.10, glib-2.28, procps, and all applications must
+have the proper .desktop files and mimetypes associated with them (should be
+fine out of the box for most Linux distros).
+
+
+Usage:
+======
+Steps to use the script in an integrated fashion with your XDG-compatible DE:
+
+* Symlink 'handler-spawn' into /usr/local/bin/
+* Copy the accompanying 'handler-spawn.desktop' to ~/.local/share/applications/
+* Run `update-desktop-database -q ~/.local/share/applications`
+* Set handler-spawn.desktop as your default handler for:
+  - http links (default web browser)
+  - Anything else you want (untested!)

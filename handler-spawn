@@ -1,0 +1,93 @@
+#!/usr/bin/env python2
+# vim: set sts=4 sw=4 et tw=0 :
+#
+# Author(s): Nirbheek Chauhan
+# License: MIT
+#
+# Opens URIs depending on the content-type rather than just the URI scheme.
+# For instance, will open http links to png files in the image viewer.
+#
+# Also keeps in mind browser startup-time penalty while determining which
+# browser to spawn to handle text/html links.
+#
+# Needs gobject-introspection-0.10, glib-2.28, and procps.
+#
+
+import os
+import subprocess
+import sys
+
+from gi.repository import Gio
+
+def usage():
+    print "Usage: %s <uri> [<uris>]" % sys.argv[0]
+
+if len(sys.argv) < 2:
+    usage()
+    sys.exit(0)
+
+sys.argv.remove(sys.argv[0])
+gfiles = []
+ps_cmd = "ps --User=%s -o cmd" % os.environ['USER']
+# Sorted by increasing order of startup penalty
+# Only use names of executables here
+handler_overrides = {'text/html': ['chromium', 'epiphany', 'firefox']}
+
+##########################################
+## Generate DesktopAppInfo handler list ##
+##########################################
+# This segment will get slow if handler_overrides gets very large
+for (content_type, handlers) in handler_overrides.iteritems():
+    default_handlers = Gio.app_info_get_all_for_type(content_type)
+    sorted_handlers = []
+    for handler in handlers:
+        for dhandler in default_handlers:
+            if handler == dhandler.get_executable():
+                sorted_handlers.append(dhandler)
+                break
+    handler_overrides[content_type] = sorted_handlers
+
+###############
+## Functions ##
+###############
+def get_proper_handler(content_type):
+    """
+    Returns a handler for the given content_type based on various heuristics.
+    Currently only based on the overrides specified in 'handler_overrides'.
+    """
+    handlers = handler_overrides[content_type]
+    if not handlers:
+        return Gio.app_info_get_default_for_type(content_type)
+    process_list = subprocess.Popen(ps_cmd, shell=True, stdout=subprocess.PIPE).communicate()[0].split('\n')
+    handlers.reverse()
+    for handler in handlers:
+        if handler.get_executable() in process_list:
+            # If it's running, we want this
+            return handler
+    # Return the handler with the least startup penalty
+    return handlers[-1]
+
+###########
+## Work! ##
+###########
+for arg in sys.argv:
+    gfile = Gio.file_new_for_uri(arg)
+    # Check if URI is valid
+    if not gfile.query_exists(None):
+        print "Invalid URI %s, ignoring" % gfile.get_uri()
+        continue
+    content_type = gfile.query_info('standard::content-type', Gio.FileQueryInfoFlags.NONE, None).get_content_type()
+    handler = None
+    if content_type in handler_overrides.keys():
+        handler = get_proper_handler(content_type)
+    else:
+        handler = Gio.app_info_get_default_for_type(content_type, True)
+    gfiles.append((gfile, handler))
+
+if not gfiles:
+    sys.exit(1)
+
+for (gfile, handler) in gfiles:
+    # We rely on the handler to manage unique instances
+    # Mostly not a problem with GNOME apps which use GApplication
+    handler.launch_uris([gfile.get_uri()], None)
