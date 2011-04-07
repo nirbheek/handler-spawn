@@ -21,7 +21,7 @@ Usage:
 Steps to use the script in an integrated fashion with your XDG-compatible DE:
 
 * Symlink 'handler-spawn' into /usr/local/bin/
-* Copy the accompanying 'handler-spawn.desktop' to ~/.local/share/applications/
+* Symlink 'handler-spawn.desktop' into ~/.local/share/applications/
 * Run `update-desktop-database -q ~/.local/share/applications`
 * Set handler-spawn.desktop as your default handler for:
   - http links (default web browser)
